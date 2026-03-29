@@ -1,5 +1,5 @@
 // Bus Reservation System - C++ OOP Implementation
-// Routes: Chennai->Salem->Coimbatore (R1), Chennai->Mayiladuthurai->Nagapattinam (R2)
+// Routes: R1 (Chennai->Salem->Coimbatore), R2 (Chennai->Mayiladuthurai->Nagapattinam), R3 (Chennai->Madurai->Kanyakumari)
 
 #include <iostream>
 #include <vector>
@@ -8,8 +8,6 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-#include <cstdlib>
-#include <ctime>
 
 using namespace std;
 
@@ -30,12 +28,11 @@ public:
     Route(string id, string name, vector<string> stopList, int seats, double f)
         : routeId(id), routeName(name), stops(stopList),
           totalSeats(seats), availableSeats(seats), fare(f) {
-        seatMap.resize(seats, false); // false = available
+        seatMap.resize(seats, false);
     }
 
     string getRouteId() const { return routeId; }
     string getRouteName() const { return routeName; }
-    vector<string> getStops() const { return stops; }
     int getTotalSeats() const { return totalSeats; }
     int getAvailableSeats() const { return availableSeats; }
     double getFare() const { return fare; }
@@ -54,10 +51,10 @@ public:
             if (!seatMap[i]) {
                 seatMap[i] = true;
                 availableSeats--;
-                return i + 1; // seat number (1-indexed)
+                return i + 1;
             }
         }
-        return -1; // no seat available
+        return -1;
     }
 
     bool cancelSeat(int seatNumber) {
@@ -152,15 +149,12 @@ private:
 
 public:
     ReservationSystem() : ticketCounter(0) {
-        // Initialize Route 1: Chennai -> Salem -> Coimbatore
         vector<string> stops1 = {"Chennai", "Salem", "Coimbatore"};
         routes["R1"] = Route("R1", "Chennai-Coimbatore Express", stops1, 30, 450.0);
 
-        // Initialize Route 2: Chennai -> Mayiladuthurai -> Nagapattinam
         vector<string> stops2 = {"Chennai", "Mayiladuthurai", "Nagapattinam"};
         routes["R2"] = Route("R2", "Chennai-Nagapattinam Express", stops2, 30, 350.0);
 
-        // Initialize Route 3: Chennai -> Madurai -> Kanyakumari
         vector<string> stops3 = {"Chennai", "Madurai", "Kanyakumari"};
         routes["R3"] = Route("R3", "Chennai-Kanyakumari Express", stops3, 30, 550.0);
 
@@ -180,19 +174,16 @@ public:
             cout << "Error: Route not found!\n";
             return "";
         }
-
         Route& route = routes[routeId];
         int seatNum = route.bookSeat();
         if (seatNum == -1) {
             cout << "Error: No seats available on this route!\n";
             return "";
         }
-
         string ticketId = generateTicketId();
         Ticket ticket(ticketId, passengerName, routeId, seatNum, route.getFare());
         tickets.push_back(ticket);
         saveTickets();
-
         cout << "\n===== Booking Confirmed =====\n";
         ticket.display();
         return ticketId;
@@ -228,16 +219,10 @@ public:
 
     void generateReport() {
         double totalRevenue = 0;
-        int totalBooked = 0;
-        int totalCancelled = 0;
-
+        int totalBooked = 0, totalCancelled = 0;
         for (const auto& ticket : tickets) {
-            if (ticket.getIsActive()) {
-                totalRevenue += ticket.getFare();
-                totalBooked++;
-            } else {
-                totalCancelled++;
-            }
+            if (ticket.getIsActive()) { totalRevenue += ticket.getFare(); totalBooked++; }
+            else totalCancelled++;
         }
 
         cout << "\n========== Revenue Report ==========\n";
@@ -250,18 +235,15 @@ public:
         int maxBooked = -1;
         for (auto& pair : routes) {
             int booked = pair.second.getTotalSeats() - pair.second.getAvailableSeats();
-            if (booked > maxBooked) {
-                maxBooked = booked;
-                popularId = pair.first;
-            }
+            if (booked > maxBooked) { maxBooked = booked; popularId = pair.first; }
         }
         if (!popularId.empty()) {
-            cout << "Most Popular Route: " << popularId << " ("
+            cout << "\nMost Popular Route: " << popularId << " ("
                  << routes[popularId].getStopsString() << ") with "
                  << maxBooked << " bookings\n";
         }
 
-        cout << "\n--- Route Wise ---\n";
+        cout << "\n--- Route Wise Occupancy ---\n";
         for (auto& pair : routes) {
             Route& r = pair.second;
             int booked = r.getTotalSeats() - r.getAvailableSeats();
@@ -274,9 +256,7 @@ public:
         ofstream file("tickets.dat");
         if (file.is_open()) {
             file << ticketCounter << "\n";
-            for (const auto& t : tickets) {
-                file << t.serialize() << "\n";
-            }
+            for (const auto& t : tickets) file << t.serialize() << "\n";
             file.close();
         }
     }
@@ -285,9 +265,7 @@ public:
         ifstream file("tickets.dat");
         if (file.is_open()) {
             string line;
-            if (getline(file, line)) {
-                ticketCounter = stoi(line);
-            }
+            if (getline(file, line)) ticketCounter = stoi(line);
             while (getline(file, line)) {
                 if (!line.empty()) {
                     Ticket t = Ticket::deserialize(line);
@@ -322,12 +300,10 @@ int main() {
         cin.ignore();
 
         switch (choice) {
-            case 1:
-                system.displayRoutes();
-                break;
+            case 1: system.displayRoutes(); break;
             case 2: {
                 string routeId, name;
-                cout << "Enter Route ID (R1/R2): ";
+                cout << "Enter Route ID (R1/R2/R3): ";
                 getline(cin, routeId);
                 cout << "Enter Passenger Name: ";
                 getline(cin, name);
@@ -348,16 +324,10 @@ int main() {
                 system.searchTicket(ticketId);
                 break;
             }
-            case 5:
-                system.generateReport();
-                break;
-            case 6:
-                cout << "Thank you for using Bus Reservation System!\n";
-                return 0;
-            default:
-                cout << "Invalid choice. Try again.\n";
+            case 5: system.generateReport(); break;
+            case 6: cout << "Thank you for using Bus Reservation System!\n"; return 0;
+            default: cout << "Invalid choice. Try again.\n";
         }
     }
-
     return 0;
 }
