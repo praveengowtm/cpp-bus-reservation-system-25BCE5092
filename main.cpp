@@ -1,91 +1,142 @@
-/*
- * Bus Reservation System - C++ Source
- * Routes:
- *   R1: Chennai -> Salem -> Coimbatore (Fare: 450, 30 seats)
- *   R2: Chennai -> Mayiladuthurai -> Nagapattinam (Fare: 350, 30 seats)
- *
- * Features: Book, Cancel, Search, Revenue Report
- * This file is the reference C++ implementation.
- * The web UI (index.html + index.js) mirrors this logic in JavaScript.
- */
+// Bus Reservation System - C++ OOP Implementation
+// Routes: Chennai->Salem->Coimbatore (R1), Chennai->Mayiladuthurai->Nagapattinam (R2)
 
 #include <iostream>
-#include <fstream>
 #include <vector>
-#include <string>
 #include <map>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
-#include <algorithm>
-#include <iomanip>
 
 using namespace std;
 
-// ─── Route Class ───
+// ==================== Route Class ====================
 class Route {
-public:
-    string id;
-    string name;
+private:
+    string routeId;
+    string routeName;
     vector<string> stops;
-    double fare;
     int totalSeats;
     int availableSeats;
+    double fare;
+    vector<bool> seatMap;
 
-    Route() : fare(0), totalSeats(0), availableSeats(0) {}
+public:
+    Route() : totalSeats(0), availableSeats(0), fare(0) {}
 
-    Route(string id, string name, vector<string> stops, double fare, int seats)
-        : id(id), name(name), stops(stops), fare(fare),
-          totalSeats(seats), availableSeats(seats) {}
+    Route(string id, string name, vector<string> stopList, int seats, double f)
+        : routeId(id), routeName(name), stops(stopList),
+          totalSeats(seats), availableSeats(seats), fare(f) {
+        seatMap.resize(seats, false); // false = available
+    }
 
-    bool bookSeat() {
-        if (availableSeats > 0) { availableSeats--; return true; }
+    string getRouteId() const { return routeId; }
+    string getRouteName() const { return routeName; }
+    vector<string> getStops() const { return stops; }
+    int getTotalSeats() const { return totalSeats; }
+    int getAvailableSeats() const { return availableSeats; }
+    double getFare() const { return fare; }
+
+    string getStopsString() const {
+        string result;
+        for (size_t i = 0; i < stops.size(); i++) {
+            result += stops[i];
+            if (i < stops.size() - 1) result += " -> ";
+        }
+        return result;
+    }
+
+    int bookSeat() {
+        for (int i = 0; i < totalSeats; i++) {
+            if (!seatMap[i]) {
+                seatMap[i] = true;
+                availableSeats--;
+                return i + 1; // seat number (1-indexed)
+            }
+        }
+        return -1; // no seat available
+    }
+
+    bool cancelSeat(int seatNumber) {
+        int idx = seatNumber - 1;
+        if (idx >= 0 && idx < totalSeats && seatMap[idx]) {
+            seatMap[idx] = false;
+            availableSeats++;
+            return true;
+        }
         return false;
     }
 
-    void cancelSeat() {
-        if (availableSeats < totalSeats) availableSeats++;
-    }
-
-    void display() const {
-        cout << "  Route " << id << ": " << name << endl;
-        cout << "  Stops: ";
-        for (size_t i = 0; i < stops.size(); i++) {
-            cout << stops[i];
-            if (i < stops.size() - 1) cout << " -> ";
-        }
-        cout << endl;
-        cout << "  Fare: Rs." << fare
-             << " | Available: " << availableSeats << "/" << totalSeats << endl;
+    void displayInfo() const {
+        cout << "Route ID: " << routeId << endl;
+        cout << "Route: " << getStopsString() << endl;
+        cout << "Total Seats: " << totalSeats << endl;
+        cout << "Available Seats: " << availableSeats << endl;
+        cout << "Fare: Rs." << fare << endl;
     }
 };
 
-// ─── Ticket Class ───
+// ==================== Ticket Class ====================
 class Ticket {
-public:
+private:
     string ticketId;
     string passengerName;
     string routeId;
     int seatNumber;
     double fare;
-    bool active;
+    bool isActive;
 
-    Ticket() : seatNumber(0), fare(0), active(false) {}
+public:
+    Ticket() : seatNumber(0), fare(0), isActive(false) {}
 
-    Ticket(string tid, string pname, string rid, int seat, double f)
-        : ticketId(tid), passengerName(pname), routeId(rid),
-          seatNumber(seat), fare(f), active(true) {}
+    Ticket(string tId, string name, string rId, int seat, double f)
+        : ticketId(tId), passengerName(name), routeId(rId),
+          seatNumber(seat), fare(f), isActive(true) {}
+
+    string getTicketId() const { return ticketId; }
+    string getPassengerName() const { return passengerName; }
+    string getRouteId() const { return routeId; }
+    int getSeatNumber() const { return seatNumber; }
+    double getFare() const { return fare; }
+    bool getIsActive() const { return isActive; }
+
+    void cancel() { isActive = false; }
 
     void display() const {
-        cout << "  Ticket ID   : " << ticketId << endl;
-        cout << "  Passenger   : " << passengerName << endl;
-        cout << "  Route       : " << routeId << endl;
-        cout << "  Seat Number : " << seatNumber << endl;
-        cout << "  Fare        : Rs." << fare << endl;
-        cout << "  Status      : " << (active ? "Active" : "Cancelled") << endl;
+        cout << "Ticket ID: " << ticketId << endl;
+        cout << "Passenger: " << passengerName << endl;
+        cout << "Route: " << routeId << endl;
+        cout << "Seat: " << seatNumber << endl;
+        cout << "Fare: Rs." << fare << endl;
+        cout << "Status: " << (isActive ? "Active" : "Cancelled") << endl;
+    }
+
+    string serialize() const {
+        stringstream ss;
+        ss << ticketId << "|" << passengerName << "|" << routeId << "|"
+           << seatNumber << "|" << fare << "|" << isActive;
+        return ss.str();
+    }
+
+    static Ticket deserialize(const string& data) {
+        stringstream ss(data);
+        string tId, name, rId, seatStr, fareStr, activeStr;
+        getline(ss, tId, '|');
+        getline(ss, name, '|');
+        getline(ss, rId, '|');
+        getline(ss, seatStr, '|');
+        getline(ss, fareStr, '|');
+        getline(ss, activeStr, '|');
+        Ticket t(tId, name, rId, stoi(seatStr), stod(fareStr));
+        if (activeStr == "0") t.cancel();
+        return t;
     }
 };
 
-// ─── Reservation System Class ───
+// ==================== ReservationSystem Class ====================
 class ReservationSystem {
 private:
     map<string, Route> routes;
@@ -94,193 +145,219 @@ private:
 
     string generateTicketId() {
         ticketCounter++;
-        return "TKT" + to_string(1000 + ticketCounter);
+        stringstream ss;
+        ss << "TKT" << ticketCounter;
+        return ss.str();
     }
 
 public:
     ReservationSystem() : ticketCounter(0) {
-        // Route 1: Chennai -> Salem -> Coimbatore
-        routes["R1"] = Route("R1", "Chennai - Coimbatore Express",
-            {"Chennai", "Salem", "Coimbatore"}, 450.0, 30);
+        // Initialize Route 1: Chennai -> Salem -> Coimbatore
+        vector<string> stops1 = {"Chennai", "Salem", "Coimbatore"};
+        routes["R1"] = Route("R1", "Chennai-Coimbatore Express", stops1, 30, 450.0);
 
-        // Route 2: Chennai -> Mayiladuthurai -> Nagapattinam
-        routes["R2"] = Route("R2", "Chennai - Nagapattinam Express",
-            {"Chennai", "Mayiladuthurai", "Nagapattinam"}, 350.0, 30);
+        // Initialize Route 2: Chennai -> Mayiladuthurai -> Nagapattinam
+        vector<string> stops2 = {"Chennai", "Mayiladuthurai", "Nagapattinam"};
+        routes["R2"] = Route("R2", "Chennai-Nagapattinam Express", stops2, 30, 350.0);
+
+        // Initialize Route 3: Chennai -> Madurai -> Kanyakumari
+        vector<string> stops3 = {"Chennai", "Madurai", "Kanyakumari"};
+        routes["R3"] = Route("R3", "Chennai-Kanyakumari Express", stops3, 30, 550.0);
 
         loadTickets();
     }
 
-    ~ReservationSystem() { saveTickets(); }
-
     void displayRoutes() {
-        cout << "\n╔══════════════════════════════════╗" << endl;
-        cout << "║       AVAILABLE ROUTES           ║" << endl;
-        cout << "╚══════════════════════════════════╝" << endl;
-        for (auto& p : routes) {
-            p.second.display();
-            cout << "  ────────────────────────────" << endl;
+        cout << "\n========== Available Routes ==========\n";
+        for (auto& pair : routes) {
+            pair.second.displayInfo();
+            cout << "--------------------------------------\n";
         }
     }
 
-    void bookTicket() {
-        displayRoutes();
-        cout << "\nEnter Route ID (R1/R2): ";
-        string rid; cin >> rid;
-        transform(rid.begin(), rid.end(), rid.begin(), ::toupper);
-
-        if (routes.find(rid) == routes.end()) {
-            cout << "  ✗ Invalid route ID.\n"; return;
+    string bookTicket(const string& routeId, const string& passengerName) {
+        if (routes.find(routeId) == routes.end()) {
+            cout << "Error: Route not found!\n";
+            return "";
         }
 
-        Route& route = routes[rid];
-        if (route.availableSeats <= 0) {
-            cout << "  ✗ No seats available on this route.\n"; return;
+        Route& route = routes[routeId];
+        int seatNum = route.bookSeat();
+        if (seatNum == -1) {
+            cout << "Error: No seats available on this route!\n";
+            return "";
         }
 
-        cout << "Enter Passenger Name: ";
-        cin.ignore();
-        string name; getline(cin, name);
-
-        int seat = route.totalSeats - route.availableSeats + 1;
-        route.bookSeat();
-
-        string tid = generateTicketId();
-        Ticket t(tid, name, rid, seat, route.fare);
-        tickets.push_back(t);
+        string ticketId = generateTicketId();
+        Ticket ticket(ticketId, passengerName, routeId, seatNum, route.getFare());
+        tickets.push_back(ticket);
         saveTickets();
 
-        cout << "\n  ✓ Booking Confirmed!\n";
-        t.display();
+        cout << "\n===== Booking Confirmed =====\n";
+        ticket.display();
+        return ticketId;
     }
 
-    void cancelTicket() {
-        cout << "\nEnter Ticket ID to cancel: ";
-        string tid; cin >> tid;
-
-        for (auto& t : tickets) {
-            if (t.ticketId == tid && t.active) {
-                t.active = false;
-                routes[t.routeId].cancelSeat();
+    bool cancelTicket(const string& ticketId) {
+        for (auto& ticket : tickets) {
+            if (ticket.getTicketId() == ticketId && ticket.getIsActive()) {
+                string rId = ticket.getRouteId();
+                if (routes.find(rId) != routes.end()) {
+                    routes[rId].cancelSeat(ticket.getSeatNumber());
+                }
+                ticket.cancel();
                 saveTickets();
-                cout << "  ✓ Ticket " << tid << " cancelled successfully.\n";
+                cout << "Ticket " << ticketId << " cancelled successfully.\n";
+                return true;
+            }
+        }
+        cout << "Error: Ticket not found or already cancelled.\n";
+        return false;
+    }
+
+    void searchTicket(const string& ticketId) {
+        for (const auto& ticket : tickets) {
+            if (ticket.getTicketId() == ticketId) {
+                cout << "\n===== Ticket Details =====\n";
+                ticket.display();
                 return;
             }
         }
-        cout << "  ✗ Ticket not found or already cancelled.\n";
+        cout << "Ticket not found.\n";
     }
 
-    void searchTicket() {
-        cout << "\nEnter Ticket ID to search: ";
-        string tid; cin >> tid;
-
-        for (auto& t : tickets) {
-            if (t.ticketId == tid) {
-                cout << "\n  Ticket Found:\n";
-                t.display();
-                return;
-            }
-        }
-        cout << "  ✗ Ticket not found.\n";
-    }
-
-    void revenueReport() {
-        cout << "\n╔══════════════════════════════════╗" << endl;
-        cout << "║        REVENUE REPORT            ║" << endl;
-        cout << "╚══════════════════════════════════╝" << endl;
-
+    void generateReport() {
         double totalRevenue = 0;
-        map<string, double> routeRevenue;
-        map<string, int> routeBookings;
+        int totalBooked = 0;
+        int totalCancelled = 0;
 
-        for (auto& t : tickets) {
-            if (t.active) {
-                routeRevenue[t.routeId] += t.fare;
-                routeBookings[t.routeId]++;
-                totalRevenue += t.fare;
+        for (const auto& ticket : tickets) {
+            if (ticket.getIsActive()) {
+                totalRevenue += ticket.getFare();
+                totalBooked++;
+            } else {
+                totalCancelled++;
             }
         }
 
-        for (auto& p : routes) {
-            cout << "  Route " << p.first << " (" << p.second.name << "):" << endl;
-            cout << "    Bookings: " << routeBookings[p.first]
-                 << " | Revenue: Rs." << fixed << setprecision(2)
-                 << routeRevenue[p.first] << endl;
+        cout << "\n========== Revenue Report ==========\n";
+        cout << "Total Bookings: " << totalBooked << endl;
+        cout << "Total Cancellations: " << totalCancelled << endl;
+        cout << "Total Revenue: Rs." << totalRevenue << endl;
+
+        // Most popular route
+        string popularId;
+        int maxBooked = -1;
+        for (auto& pair : routes) {
+            int booked = pair.second.getTotalSeats() - pair.second.getAvailableSeats();
+            if (booked > maxBooked) {
+                maxBooked = booked;
+                popularId = pair.first;
+            }
+        }
+        if (!popularId.empty()) {
+            cout << "Most Popular Route: " << popularId << " ("
+                 << routes[popularId].getStopsString() << ") with "
+                 << maxBooked << " bookings\n";
         }
 
-        cout << "\n  Total Revenue: Rs." << fixed << setprecision(2)
-             << totalRevenue << endl;
+        cout << "\n--- Route Wise ---\n";
+        for (auto& pair : routes) {
+            Route& r = pair.second;
+            int booked = r.getTotalSeats() - r.getAvailableSeats();
+            cout << r.getRouteId() << " (" << r.getStopsString() << "): "
+                 << booked << "/" << r.getTotalSeats() << " seats booked\n";
+        }
     }
 
     void saveTickets() {
-        ofstream f("tickets.dat");
-        for (auto& t : tickets) {
-            f << t.ticketId << "|" << t.passengerName << "|"
-              << t.routeId << "|" << t.seatNumber << "|"
-              << t.fare << "|" << t.active << endl;
+        ofstream file("tickets.dat");
+        if (file.is_open()) {
+            file << ticketCounter << "\n";
+            for (const auto& t : tickets) {
+                file << t.serialize() << "\n";
+            }
+            file.close();
         }
-        f.close();
     }
 
     void loadTickets() {
-        ifstream f("tickets.dat");
-        if (!f.is_open()) return;
-        string line;
-        while (getline(f, line)) {
-            size_t p1 = line.find('|');
-            size_t p2 = line.find('|', p1 + 1);
-            size_t p3 = line.find('|', p2 + 1);
-            size_t p4 = line.find('|', p3 + 1);
-            size_t p5 = line.find('|', p4 + 1);
-            if (p5 == string::npos) continue;
-
-            Ticket t;
-            t.ticketId      = line.substr(0, p1);
-            t.passengerName = line.substr(p1+1, p2-p1-1);
-            t.routeId       = line.substr(p2+1, p3-p2-1);
-            t.seatNumber    = stoi(line.substr(p3+1, p4-p3-1));
-            t.fare          = stod(line.substr(p4+1, p5-p4-1));
-            t.active        = line.substr(p5+1) == "1";
-            tickets.push_back(t);
-
-            int num = stoi(t.ticketId.substr(3)) - 1000;
-            if (num > ticketCounter) ticketCounter = num;
-
-            if (t.active && routes.count(t.routeId))
-                routes[t.routeId].bookSeat();
+        ifstream file("tickets.dat");
+        if (file.is_open()) {
+            string line;
+            if (getline(file, line)) {
+                ticketCounter = stoi(line);
+            }
+            while (getline(file, line)) {
+                if (!line.empty()) {
+                    Ticket t = Ticket::deserialize(line);
+                    tickets.push_back(t);
+                    if (t.getIsActive() && routes.find(t.getRouteId()) != routes.end()) {
+                        routes[t.getRouteId()].bookSeat();
+                    }
+                }
+            }
+            file.close();
         }
-        f.close();
     }
 };
 
-// ─── Main ───
+// ==================== Main Function ====================
 int main() {
-    ReservationSystem sys;
+    ReservationSystem system;
     int choice;
 
-    do {
-        cout << "\n╔══════════════════════════════════╗" << endl;
-        cout << "║   BUS RESERVATION SYSTEM         ║" << endl;
-        cout << "╠══════════════════════════════════╣" << endl;
-        cout << "║  1. View Routes                  ║" << endl;
-        cout << "║  2. Book Ticket                  ║" << endl;
-        cout << "║  3. Cancel Ticket                ║" << endl;
-        cout << "║  4. Search Ticket                ║" << endl;
-        cout << "║  5. Revenue Report               ║" << endl;
-        cout << "║  6. Exit                         ║" << endl;
-        cout << "╚══════════════════════════════════╝" << endl;
+    while (true) {
+        cout << "\n====================================\n";
+        cout << "   BUS RESERVATION SYSTEM\n";
+        cout << "====================================\n";
+        cout << "1. View Routes\n";
+        cout << "2. Book Ticket\n";
+        cout << "3. Cancel Ticket\n";
+        cout << "4. Search Ticket\n";
+        cout << "5. Revenue Report\n";
+        cout << "6. Exit\n";
         cout << "Enter choice: ";
         cin >> choice;
+        cin.ignore();
 
         switch (choice) {
-            case 1: sys.displayRoutes();  break;
-            case 2: sys.bookTicket();     break;
-            case 3: sys.cancelTicket();   break;
-            case 4: sys.searchTicket();   break;
-            case 5: sys.revenueReport();  break;
-            case 6: cout << "  Goodbye!\n"; break;
-            default: cout << "  ✗ Invalid choice.\n";
+            case 1:
+                system.displayRoutes();
+                break;
+            case 2: {
+                string routeId, name;
+                cout << "Enter Route ID (R1/R2): ";
+                getline(cin, routeId);
+                cout << "Enter Passenger Name: ";
+                getline(cin, name);
+                system.bookTicket(routeId, name);
+                break;
+            }
+            case 3: {
+                string ticketId;
+                cout << "Enter Ticket ID: ";
+                getline(cin, ticketId);
+                system.cancelTicket(ticketId);
+                break;
+            }
+            case 4: {
+                string ticketId;
+                cout << "Enter Ticket ID: ";
+                getline(cin, ticketId);
+                system.searchTicket(ticketId);
+                break;
+            }
+            case 5:
+                system.generateReport();
+                break;
+            case 6:
+                cout << "Thank you for using Bus Reservation System!\n";
+                return 0;
+            default:
+                cout << "Invalid choice. Try again.\n";
         }
-    } while (choice != 6);
+    }
 
     return 0;
 }
